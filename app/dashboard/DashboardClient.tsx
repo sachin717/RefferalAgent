@@ -16,33 +16,36 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import Grid from "@mui/material/Grid";
 
 type Job = {
-  id: string | number;
+  id: string;
   title?: string | null;
   company?: string | null;
-  location?: string | null;
+  link?: string | null;
 };
 
 type Employee = {
-  id: string | number;
+  id: string;
   name?: string | null;
   email?: string | null;
+  company?: string | null;
+  emailSent?: boolean | null;
 };
 
 type Message = {
-  id: string | number;
-  subject?: string | null;
-  body?: string | null;
+  id: string;
+  text?: string | null;
+  employeeId?: string | null;
+  jobTitle?: string | null;
+  company?: string | null;
 };
 
 type QueueItem = {
-  id: string | number;
+  id: string;
   to?: string | null;
-  email?: string | null;
-  subject?: string | null;
+  text?: string | null;
   status?: string | null;
+  company?: string | null;
 };
 
 type Props = {
@@ -52,10 +55,9 @@ type Props = {
   initialQueue: QueueItem[];
 };
 
-type ActionState = {
-  loading: boolean;
-  error: string;
-  success: string;
+type RowState = {
+  generate: boolean;
+  send: boolean;
 };
 
 export default function DashboardClient({
@@ -65,150 +67,84 @@ export default function DashboardClient({
   initialQueue,
 }: Props) {
   const [jobs] = useState<Job[]>(initialJobs);
-  const [employees] = useState<Employee[]>(initialEmployees);
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [queue, setQueue] = useState<QueueItem[]>(initialQueue);
-
+  const [queue] = useState<QueueItem[]>(initialQueue);
   const [automation, setAutomation] = useState(false);
 
-  const [bulkGenerateState, setBulkGenerateState] = useState<ActionState>({
-    loading: false,
-    error: "",
-    success: "",
-  });
-
-  const [rowStates, setRowStates] = useState<
-    Record<string, { generate: boolean; send: boolean }>
-  >({});
-
-  const [selectedMessage, setSelectedMessage] = useState<{
-    employeeId: string;
-    employeeName: string;
-    subject: string;
-    body: string;
-  } | null>(null);
-
+  const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
   const [pageNotice, setPageNotice] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
+  const [selectedMessage, setSelectedMessage] = useState<{
+    employeeId: string;
+    employeeName: string;
+    company: string;
+    body: string;
+  } | null>(null);
+
   const employeeState = useMemo(() => {
-    return (employeeId: string | number) => {
-      const key = String(employeeId);
-      return rowStates[key] || { generate: false, send: false };
+    return (employeeId: string) => {
+      return rowStates[employeeId] || { generate: false, send: false };
     };
   }, [rowStates]);
 
   const updateRowState = (
-    employeeId: string | number,
+    employeeId: string,
     type: "generate" | "send",
     value: boolean
   ) => {
-    const key = String(employeeId);
     setRowStates((prev) => ({
       ...prev,
-      [key]: {
-        ...prev[key],
+      [employeeId]: {
+        ...(prev[employeeId] || { generate: false, send: false }),
         [type]: value,
       },
     }));
   };
 
-  const handleGenerateAllEmails = async () => {
-    try {
-      setBulkGenerateState({
-        loading: true,
-        error: "",
-        success: "",
-      });
-      setPageNotice(null);
-
-      const res = await fetch("/api/generate-emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to generate emails.");
-      }
-
-      if (Array.isArray(data?.messages) && data.messages.length > 0) {
-        setMessages((prev) => {
-          const merged = [...data.messages, ...prev];
-          const unique = merged.filter(
-            (item, index, arr) =>
-              index === arr.findIndex((x) => String(x.id) === String(item.id))
-          );
-          return unique.slice(0, 10);
-        });
-      }
-
-      setBulkGenerateState({
-        loading: false,
-        error: "",
-        success: data?.message || "Emails generated successfully.",
-      });
-    } catch (error) {
-      setBulkGenerateState({
-        loading: false,
-        error: error instanceof Error ? error.message : "Something went wrong.",
-        success: "",
-      });
-    }
-  };
-
   const handleGenerateEmail = async (employee: Employee) => {
-    const employeeId = String(employee.id);
+    const employeeId = employee.id;
 
     try {
       updateRowState(employeeId, "generate", true);
       setPageNotice(null);
 
-      const res = await fetch(`/api/generate-email?employeeId=${employeeId}`, {
-        method: "GET",
+      const res = await fetch("/api/generateMessage", {
+        method: "POST",
         headers: {
-          Accept: "application/json",
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({ id: employeeId }),
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to generate email.");
+        throw new Error(data?.error || "Failed to generate email");
       }
 
       if (data?.message) {
-        setMessages((prev) => {
-          const merged = [data.message, ...prev];
-          const unique = merged.filter(
-            (item, index, arr) =>
-              index === arr.findIndex((x) => String(x.id) === String(item.id))
-          );
-          return unique.slice(0, 10);
-        });
+        setMessages((prev) => [data.message, ...prev].slice(0, 10));
       }
 
       setSelectedMessage({
         employeeId,
         employeeName: employee.name || "Unknown Employee",
-        subject:
-          data?.message?.subject || data?.subject || "Referral request",
-        body: data?.message?.body || data?.body || "No message returned.",
+        company: employee.company || "Unknown Company",
+        body: data?.message?.text || data?.preview || "No message returned",
       });
 
       setPageNotice({
         type: "success",
-        text: `Email generated for ${employee.name || "employee"}.`,
+        text: `Message generated for ${employee.name || "employee"}`,
       });
     } catch (error) {
       setPageNotice({
         type: "error",
-        text: error instanceof Error ? error.message : "Failed to generate email.",
+        text: error instanceof Error ? error.message : "Failed to generate email",
       });
     } finally {
       updateRowState(employeeId, "generate", false);
@@ -216,45 +152,40 @@ export default function DashboardClient({
   };
 
   const handleSendReferral = async (employee: Employee) => {
-    const employeeId = String(employee.id);
+    const employeeId = employee.id;
 
     try {
       updateRowState(employeeId, "send", true);
       setPageNotice(null);
 
-      const res = await fetch(`/api/send-referral?employeeId=${employeeId}`, {
+      const res = await fetch("/api/sendManual", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
+        body: JSON.stringify({ id: employeeId }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to send referral.");
+      if (!res.ok || data?.error) {
+        throw new Error(data?.error || "Failed to send referral");
       }
 
-      if (data?.queueItem) {
-        setQueue((prev) => {
-          const merged = [data.queueItem, ...prev];
-          const unique = merged.filter(
-            (item, index, arr) =>
-              index === arr.findIndex((x) => String(x.id) === String(item.id))
-          );
-          return unique.slice(0, 10);
-        });
-      }
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === employeeId ? { ...emp, emailSent: true } : emp
+        )
+      );
 
       setPageNotice({
         type: "success",
-        text: data?.message || `Referral sent to ${employee.name || "employee"}.`,
+        text: `Referral sent to ${employee.name || "employee"}`,
       });
     } catch (error) {
       setPageNotice({
         type: "error",
-        text: error instanceof Error ? error.message : "Failed to send referral.",
+        text: error instanceof Error ? error.message : "Failed to send referral",
       });
     } finally {
       updateRowState(employeeId, "send", false);
@@ -277,32 +208,13 @@ export default function DashboardClient({
             Referral Dashboard
           </Typography>
 
-          <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography>Automation</Typography>
-              <Switch
-                checked={automation}
-                onChange={(e) => setAutomation(e.target.checked)}
-              />
-            </Box>
-
-            <Button variant="contained" color="success">
-              SCRAPE GOOGLE
-            </Button>
-
-            <Button variant="contained" color="secondary">
-              SCRAPE LINKEDIN
-            </Button>
-
-            <Button
-              variant="contained"
-              onClick={handleGenerateAllEmails}
-              disabled={bulkGenerateState.loading}
-              sx={{ bgcolor: "#ff9800", "&:hover": { bgcolor: "#f57c00" } }}
-            >
-              {bulkGenerateState.loading ? "GENERATING..." : "GENERATE EMAILS"}
-            </Button>
-          </Stack>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography>Automation</Typography>
+            <Switch
+              checked={automation}
+              onChange={(e) => setAutomation(e.target.checked)}
+            />
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -313,29 +225,28 @@ export default function DashboardClient({
           </Alert>
         )}
 
-        {bulkGenerateState.error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {bulkGenerateState.error}
-          </Alert>
-        )}
-
-        {bulkGenerateState.success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            {bulkGenerateState.success}
-          </Alert>
-        )}
-
         {selectedMessage && (
-          <Paper sx={{ p: 3, borderRadius: 3, mb: 3, bgcolor: "#111827", color: "#fff" }}>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              mb: 3,
+              bgcolor: "#111827",
+              color: "#fff",
+            }}
+          >
             <Typography variant="h6" fontWeight={700} gutterBottom>
               Latest Generated Email Preview
             </Typography>
+
             <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
               For: {selectedMessage.employeeName}
             </Typography>
-            <Typography fontWeight={700} sx={{ mb: 1 }}>
-              Subject: {selectedMessage.subject}
+
+            <Typography variant="body2" sx={{ opacity: 0.8, mb: 2 }}>
+              Company: {selectedMessage.company}
             </Typography>
+
             <Typography
               variant="body2"
               sx={{
@@ -349,22 +260,63 @@ export default function DashboardClient({
           </Paper>
         )}
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
-              <Typography variant="h5" fontWeight={700} gutterBottom>
-                Jobs
-              </Typography>
-              <Chip label={`${jobs.length} recent jobs`} sx={{ mb: 2 }} />
-              <Divider sx={{ mb: 2 }} />
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            gap: 3,
+          }}
+        >
+          <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Jobs
+            </Typography>
+            <Chip label={`${jobs.length} recent jobs`} sx={{ mb: 2 }} />
+            <Divider sx={{ mb: 2 }} />
 
-              {jobs.length === 0 ? (
-                <Typography color="text.secondary">No jobs found</Typography>
-              ) : (
-                <Stack spacing={1.5}>
-                  {jobs.map((job) => (
+            {jobs.length === 0 ? (
+              <Typography color="text.secondary">No jobs found</Typography>
+            ) : (
+              <Stack spacing={1.5}>
+                {jobs.map((job) => (
+                  <Box
+                    key={job.id}
+                    sx={{
+                      p: 2,
+                      border: "1px solid #e0e0e0",
+                      borderRadius: 2,
+                      bgcolor: "#fafafa",
+                    }}
+                  >
+                    <Typography fontWeight={700}>
+                      {job.title || "Untitled Job"}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {job.company || "No company"}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+
+          <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Employees / Referrers
+            </Typography>
+            <Chip label={`${employees.length} recent employees`} sx={{ mb: 2 }} />
+            <Divider sx={{ mb: 2 }} />
+
+            {employees.length === 0 ? (
+              <Typography color="text.secondary">No employees found</Typography>
+            ) : (
+              <Stack spacing={1.5}>
+                {employees.map((emp) => {
+                  const state = employeeState(emp.id);
+
+                  return (
                     <Box
-                      key={job.id}
+                      key={emp.id}
                       sx={{
                         p: 2,
                         border: "1px solid #e0e0e0",
@@ -373,180 +325,155 @@ export default function DashboardClient({
                       }}
                     >
                       <Typography fontWeight={700}>
-                        {job.title || "Untitled Job"}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        {job.company || "No company"} • {job.location || "No location"}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              )}
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
-              <Typography variant="h5" fontWeight={700} gutterBottom>
-                Employees / Referrers
-              </Typography>
-              <Chip label={`${employees.length} recent employees`} sx={{ mb: 2 }} />
-              <Divider sx={{ mb: 2 }} />
-
-              {employees.length === 0 ? (
-                <Typography color="text.secondary">No employees found</Typography>
-              ) : (
-                <Stack spacing={1.5}>
-                  {employees.map((emp) => {
-                    const state = employeeState(emp.id);
-
-                    return (
-                      <Box
-                        key={emp.id}
-                        sx={{
-                          p: 2,
-                          border: "1px solid #e0e0e0",
-                          borderRadius: 2,
-                          bgcolor: "#fafafa",
-                        }}
-                      >
-                        <Typography fontWeight={700}>
-                          {emp.name || "No name"}
-                        </Typography>
-
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                          {emp.email || "No email"}
-                        </Typography>
-
-                        <Stack direction="row" spacing={1.5} sx={{ mt: 2 }} flexWrap="wrap">
-                          <Button
-                            size="small"
-                            variant="contained"
-                            disabled={state.generate}
-                            onClick={() => handleGenerateEmail(emp)}
-                            sx={{ bgcolor: "#ff9800", "&:hover": { bgcolor: "#f57c00" } }}
-                          >
-                            {state.generate ? (
-                              <>
-                                <CircularProgress size={16} sx={{ mr: 1, color: "#fff" }} />
-                                Generating...
-                              </>
-                            ) : (
-                              "Generate Email"
-                            )}
-                          </Button>
-
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="primary"
-                            disabled={state.send}
-                            onClick={() => handleSendReferral(emp)}
-                          >
-                            {state.send ? (
-                              <>
-                                <CircularProgress size={16} sx={{ mr: 1, color: "#fff" }} />
-                                Sending...
-                              </>
-                            ) : (
-                              "Send Referral"
-                            )}
-                          </Button>
-                        </Stack>
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              )}
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
-              <Typography variant="h5" fontWeight={700} gutterBottom>
-                Generated Messages
-              </Typography>
-              <Chip label={`${messages.length} saved messages`} sx={{ mb: 2 }} />
-              <Divider sx={{ mb: 2 }} />
-
-              {messages.length === 0 ? (
-                <Typography color="text.secondary">No generated messages found</Typography>
-              ) : (
-                <Stack spacing={1.5}>
-                  {messages.map((msg) => (
-                    <Box
-                      key={msg.id}
-                      sx={{
-                        p: 2,
-                        border: "1px solid #e0e0e0",
-                        borderRadius: 2,
-                        bgcolor: "#fafafa",
-                      }}
-                    >
-                      <Typography fontWeight={700}>
-                        {msg.subject || "No subject"}
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          mt: 0.5,
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {msg.body || "No body"}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              )}
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
-              <Typography variant="h5" fontWeight={700} gutterBottom>
-                Referral Queue
-              </Typography>
-              <Chip label={`${queue.length} queued emails`} sx={{ mb: 2 }} />
-              <Divider sx={{ mb: 2 }} />
-
-              {queue.length === 0 ? (
-                <Typography color="text.secondary">No queued emails found</Typography>
-              ) : (
-                <Stack spacing={1.5}>
-                  {queue.map((item) => (
-                    <Box
-                      key={item.id}
-                      sx={{
-                        p: 2,
-                        border: "1px solid #e0e0e0",
-                        borderRadius: 2,
-                        bgcolor: "#fafafa",
-                      }}
-                    >
-                      <Typography fontWeight={700}>
-                        {item.to || item.email || "No recipient"}
+                        {emp.name || "No name"}
                       </Typography>
 
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Status: {item.status || "pending"}
+                        {emp.email || "No email"}
                       </Typography>
 
-                      <Typography variant="body2" color="text.secondary">
-                        Subject: {item.subject || "No subject"}
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {emp.company || "No company"}
                       </Typography>
+
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        Status: {emp.emailSent ? "Email sent" : "Pending"}
+                      </Typography>
+
+                      <Stack direction="row" spacing={1.5} sx={{ mt: 2 }} flexWrap="wrap">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={state.generate}
+                          onClick={() => handleGenerateEmail(emp)}
+                          sx={{ bgcolor: "#ff9800", "&:hover": { bgcolor: "#f57c00" } }}
+                        >
+                          {state.generate ? (
+                            <>
+                              <CircularProgress size={16} sx={{ mr: 1, color: "#fff" }} />
+                              Generating...
+                            </>
+                          ) : (
+                            "Generate Email"
+                          )}
+                        </Button>
+
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="primary"
+                          disabled={state.send}
+                          onClick={() => handleSendReferral(emp)}
+                        >
+                          {state.send ? (
+                            <>
+                              <CircularProgress size={16} sx={{ mr: 1, color: "#fff" }} />
+                              Sending...
+                            </>
+                          ) : (
+                            "Send Referral"
+                          )}
+                        </Button>
+                      </Stack>
                     </Box>
-                  ))}
-                </Stack>
-              )}
-            </Paper>
-          </Grid>
-        </Grid>
+                  );
+                })}
+              </Stack>
+            )}
+          </Paper>
+
+          <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Generated Messages
+            </Typography>
+            <Chip label={`${messages.length} saved messages`} sx={{ mb: 2 }} />
+            <Divider sx={{ mb: 2 }} />
+
+            {messages.length === 0 ? (
+              <Typography color="text.secondary">No generated messages found</Typography>
+            ) : (
+              <Stack spacing={1.5}>
+                {messages.map((msg) => (
+                  <Box
+                    key={msg.id}
+                    sx={{
+                      p: 2,
+                      border: "1px solid #e0e0e0",
+                      borderRadius: 2,
+                      bgcolor: "#fafafa",
+                    }}
+                  >
+                    <Typography fontWeight={700}>
+                      {msg.company || "No company"} - {msg.jobTitle || "No job title"}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mt: 0.5,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {msg.text || "No message text"}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+
+          <Paper sx={{ p: 3, borderRadius: 3, minHeight: 320 }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Referral Queue
+            </Typography>
+            <Chip label={`${queue.length} queued emails`} sx={{ mb: 2 }} />
+            <Divider sx={{ mb: 2 }} />
+
+            {queue.length === 0 ? (
+              <Typography color="text.secondary">No queued emails found</Typography>
+            ) : (
+              <Stack spacing={1.5}>
+                {queue.map((item) => (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      p: 2,
+                      border: "1px solid #e0e0e0",
+                      borderRadius: 2,
+                      bgcolor: "#fafafa",
+                    }}
+                  >
+                    <Typography fontWeight={700}>
+                      {item.to || "No recipient"}
+                    </Typography>
+
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Status: {item.status || "pending"}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mt: 0.5,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {item.text || "No text"}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+        </Box>
       </Container>
     </Box>
   );
