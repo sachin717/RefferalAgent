@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id        String @id @default(cuid())
+  title     String
+  company   String
+  link      String?
+}
+model Employee {
+  id      String @id @default(cuid())
+  name    String
+  role    String
+  profile String
+  company String
+  email   String?
+  emailSent Boolean @default(false)
+}
+
+model Message {
+  id         String @id @default(cuid())
+  text       String
+  employeeId String
+  jobTitle   String
+  company    String
+}
+model EmailLog {
+  id        String @id @default(cuid())
+  to        String
+  subject   String
+  status    String
+  createdAt DateTime @default(now())
+}
+model EmailQueue {
+  id        String @id @default(cuid())
+  to        String
+  text      String
+  status    String @default("pending")
+  company   String
+  createdAt DateTime @default(now())
+}
+model Settings {
+  id          String @id @default(cuid())
+  automation  Boolean @default(true)
+  dailyLimit  Int     @default(5)
+}
