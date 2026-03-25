@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 
 
 export async function POST(req: Request) {
-  const { id } = await req.json();
+const { id, subject, text } = await req.json();
 
   const emp = await prisma.employee.findUnique({
     where: { id },
@@ -40,17 +40,27 @@ export async function POST(req: Request) {
   }
 
   // ✅ AI message
-  const text = await generateMessage(
-    emp.name,
-    emp.company
-  );
+  // const text = await generateMessage(
+  //   emp.name,
+  //   emp.company
+  // );
 
   // ✅ send mail with resume
-  await sendMail(
-    email,
-    "4 yrs React / SharePoint — exploring roles in your org",
-    text
-  );
+await sendMail(
+  emp.email,
+  subject || `Exploring opportunities at ${emp.company}`,
+  text ||
+    `Hi ${emp.name},
+
+I hope you are doing well.
+
+I am currently exploring opportunities and would really appreciate a referral if possible.
+
+I have attached my resume.
+
+Thanks,
+Sachin`
+);
 
   // ✅ mark sent
   await prisma.employee.update({
