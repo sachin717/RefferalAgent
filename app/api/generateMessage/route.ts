@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const job = await prisma.job.findFirst({
       where: { company: emp.company },
-      orderBy: { id: "desc" },
+      orderBy: { title: "asc" },
     });
 
     if (!job) {
@@ -36,11 +36,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const text = await generateMessage(emp.name, job.title);
+    let text = "";
+
+    try {
+      text = await generateMessage(emp.name, job.title);
+    } catch (aiError) {
+      console.error("AI generation failed:", aiError);
+
+      text = `Hi ${emp.name},
+
+I hope you are doing well.
+
+I am currently exploring opportunities for ${job.title} at ${emp.company} and would really appreciate your guidance or a referral if possible.
+
+Thanks,
+Sachin`;
+    }
 
     const savedMessage = await prisma.message.create({
       data: {
-        text: text || "",
+        text,
         employeeId: emp.id,
         jobTitle: job.title,
         company: emp.company,
@@ -53,10 +68,12 @@ export async function POST(req: Request) {
       preview: savedMessage.text,
     });
   } catch (error) {
-    console.error("generateMessage error:", error);
+    console.error("generateMessage route error:", error);
 
     return NextResponse.json(
-      { error: "Failed to generate message" },
+      {
+        error: error instanceof Error ? error.message : "Failed to generate message",
+      },
       { status: 500 }
     );
   }

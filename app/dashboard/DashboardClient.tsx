@@ -71,7 +71,17 @@ export default function DashboardClient({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [queue] = useState<QueueItem[]>(initialQueue);
   const [automation, setAutomation] = useState(false);
-
+const [drafts, setDrafts] = useState<
+  Record<
+    string,
+    {
+      subject: string;
+      keywords: string;
+      body: string;
+      generated: boolean;
+    }
+  >
+>({});
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
   const [pageNotice, setPageNotice] = useState<{
     type: "success" | "error";
@@ -105,92 +115,100 @@ export default function DashboardClient({
     }));
   };
 
-  const handleGenerateEmail = async (employee: Employee) => {
-    const employeeId = employee.id;
+const handleGenerateEmail = async (employee: Employee) => {
+  const employeeId = employee.id;
 
-    try {
-      updateRowState(employeeId, "generate", true);
-      setPageNotice(null);
+  try {
+    updateRowState(employeeId, "generate", true);
+    setPageNotice(null);
 
-      const res = await fetch("/api/generateMessage", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id: employeeId }),
-      });
+    const res = await fetch("/api/generateMessage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id: employeeId }),
+    });
 
-      const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to generate email");
-      }
-
-      if (data?.message) {
-        setMessages((prev) => [data.message, ...prev].slice(0, 10));
-      }
-
-      setSelectedMessage({
-        employeeId,
-        employeeName: employee.name || "Unknown Employee",
-        company: employee.company || "Unknown Company",
-        body: data?.message?.text || data?.preview || "No message returned",
-      });
-
-      setPageNotice({
-        type: "success",
-        text: `Message generated for ${employee.name || "employee"}`,
-      });
-    } catch (error) {
-      setPageNotice({
-        type: "error",
-        text: error instanceof Error ? error.message : "Failed to generate email",
-      });
-    } finally {
-      updateRowState(employeeId, "generate", false);
+    if (!res.ok) {
+      throw new Error(data?.error || "Failed to generate email");
     }
-  };
 
-  const handleSendReferral = async (employee: Employee) => {
-    const employeeId = employee.id;
-
-    try {
-      updateRowState(employeeId, "send", true);
-      setPageNotice(null);
-
-      const res = await fetch("/api/sendManual", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id: employeeId }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data?.error) {
-        throw new Error(data?.error || "Failed to send referral");
-      }
-
-      setEmployees((prev) =>
-        prev.map((emp) =>
-          emp.id === employeeId ? { ...emp, emailSent: true } : emp
-        )
-      );
-
-      setPageNotice({
-        type: "success",
-        text: `Referral sent to ${employee.name || "employee"}`,
-      });
-    } catch (error) {
-      setPageNotice({
-        type: "error",
-        text: error instanceof Error ? error.message : "Failed to send referral",
-      });
-    } finally {
-      updateRowState(employeeId, "send", false);
+    if (data?.message) {
+      setMessages((prev) => [data.message, ...prev].slice(0, 10));
     }
-  };
+
+    setDrafts((prev) => ({
+      ...prev,
+      [employeeId]: {
+        subject: `Exploring opportunities at ${employee.company || "your company"}`,
+        keywords: "",
+        body: data?.message?.text || data?.preview || "",
+        generated: true,
+      },
+    }));
+
+    setPageNotice({
+      type: "success",
+      text: `Message generated for ${employee.name || "employee"}`,
+    });
+  } catch (error) {
+    setPageNotice({
+      type: "error",
+      text: error instanceof Error ? error.message : "Failed to generate email",
+    });
+  } finally {
+    updateRowState(employeeId, "generate", false);
+  }
+};
+
+const handleSendReferral = async (employee: Employee) => {
+  const employeeId = employee.id;
+  const draft = drafts[employeeId];
+
+  try {
+    updateRowState(employeeId, "send", true);
+    setPageNotice(null);
+
+    const res = await fetch("/api/sendManual", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: employeeId,
+        subject: draft?.subject || `Exploring opportunities at ${employee.company || "your company"}`,
+        text: draft?.body || "",
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data?.error) {
+      throw new Error(data?.error || "Failed to send referral");
+    }
+
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id === employeeId ? { ...emp, emailSent: true } : emp
+      )
+    );
+
+    setPageNotice({
+      type: "success",
+      text: `Referral sent to ${employee.name || "employee"}`,
+    });
+  } catch (error) {
+    setPageNotice({
+      type: "error",
+      text: error instanceof Error ? error.message : "Failed to send referral",
+    });
+  } finally {
+    updateRowState(employeeId, "send", false);
+  }
+};
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#0b0f14" }}>
@@ -339,7 +357,121 @@ export default function DashboardClient({
                       <Typography variant="body2" sx={{ mt: 1 }}>
                         Status: {emp.emailSent ? "Email sent" : "Pending"}
                       </Typography>
+{drafts[emp.id]?.generated && (
+  <Box
+    sx={{
+      mt: 2,
+      p: 2,
+      borderRadius: 2,
+      bgcolor: "#f8fafc",
+      border: "1px solid #dbe2ea",
+    }}
+  >
+    <Typography fontWeight={700} sx={{ mb: 1.5 }}>
+      Draft Email
+    </Typography>
 
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="body2" sx={{ mb: 0.5 }}>
+        Subject
+      </Typography>
+      <input
+        value={drafts[emp.id].subject}
+        onChange={(e) =>
+          setDrafts((prev) => ({
+            ...prev,
+            [emp.id]: {
+              ...prev[emp.id],
+              subject: e.target.value,
+            },
+          }))
+        }
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: "8px",
+          border: "1px solid #cbd5e1",
+          fontSize: "14px",
+        }}
+      />
+    </Box>
+
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="body2" sx={{ mb: 0.5 }}>
+        Keywords / Notes for Regeneration
+      </Typography>
+      <input
+        placeholder="Example: mention React, SharePoint, 4 years experience"
+        value={drafts[emp.id].keywords}
+        onChange={(e) =>
+          setDrafts((prev) => ({
+            ...prev,
+            [emp.id]: {
+              ...prev[emp.id],
+              keywords: e.target.value,
+            },
+          }))
+        }
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: "8px",
+          border: "1px solid #cbd5e1",
+          fontSize: "14px",
+        }}
+      />
+    </Box>
+
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="body2" sx={{ mb: 0.5 }}>
+        Message
+      </Typography>
+      <textarea
+        value={drafts[emp.id].body}
+        onChange={(e) =>
+          setDrafts((prev) => ({
+            ...prev,
+            [emp.id]: {
+              ...prev[emp.id],
+              body: e.target.value,
+            },
+          }))
+        }
+        rows={10}
+        style={{
+          width: "100%",
+          padding: "12px",
+          borderRadius: "8px",
+          border: "1px solid #cbd5e1",
+          fontSize: "14px",
+          resize: "vertical",
+          fontFamily: "inherit",
+          lineHeight: 1.6,
+        }}
+      />
+    </Box>
+
+    <Stack direction="row" spacing={1.5} flexWrap="wrap">
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={() => handleGenerateEmail(emp)}
+      >
+        Regenerate
+      </Button>
+
+      <Button
+        size="small"
+        variant="contained"
+        color="primary"
+        disabled={employeeState(emp.id).send}
+        onClick={() => handleSendReferral(emp)}
+      >
+        {employeeState(emp.id).send ? "Sending..." : "Send Referral"}
+      </Button>
+    </Stack>
+  </Box>
+)}
                       <Stack direction="row" spacing={1.5} sx={{ mt: 2 }} flexWrap="wrap">
                         <Button
                           size="small"
@@ -377,6 +509,7 @@ export default function DashboardClient({
                       </Stack>
                     </Box>
                   );
+
                 })}
               </Stack>
             )}
