@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "../lib/prisma";
 
-
+import AppShell from "@/app/components/AppShell";
 export default async function ProfilePage() {
   const user = await prisma.user.findFirst({
     include: {
@@ -40,8 +40,12 @@ export default async function ProfilePage() {
     preferredLocations = [];
   }
 
-  return (
-    <div
+    return (
+  <AppShell
+    title="My Profile"
+    subtitle="Your core candidate profile powering roles, outreach, and applications."
+  >
+     <div
       style={{
         padding: 24,
         background: "#0b1220",
@@ -253,5 +257,8 @@ export default async function ProfilePage() {
         </div>
       </div>
     </div>
-  );
+  </AppShell>
+);
+   
+
 }

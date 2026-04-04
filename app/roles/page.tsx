@@ -1,6 +1,7 @@
 
 import "../globals.css"
 import { prisma } from "../lib/prisma";
+import AppShell from "@/app/components/AppShell";
 function parseJsonArray(value: string | null | undefined): string[] {
   if (!value) return [];
   try {
@@ -33,6 +34,10 @@ export default async function RolesPage() {
   }
 
   return (
+      <AppShell
+    title="Role Profiles"
+    subtitle="These profiles power job matching, referral messaging, and application tailoring."
+  >
     <div
       style={{
         padding: 24,
@@ -313,5 +318,6 @@ export default async function RolesPage() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }
