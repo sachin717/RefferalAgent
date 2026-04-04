@@ -1,3 +1,4 @@
+'use client'
 import React from "react";
 import AppShell from "@/app/components/AppShell";
 import { prisma } from "@/app/lib/prisma";
@@ -130,11 +131,7 @@ export default async function LeadsPage() {
             placeholder="Common ground"
             style={inputStyle}
           />
-          <input
-            name="notes"
-            placeholder="Notes"
-            style={inputStyle}
-          />
+          <input name="notes" placeholder="Notes" style={inputStyle} />
 
           <button
             type="submit"
@@ -198,7 +195,10 @@ export default async function LeadsPage() {
                   <th style={thStyle}>Priority</th>
                   <th style={thStyle}>Status</th>
                   <th style={thStyle}>LinkedIn</th>
-                  <th style={thStyle}>Notes</th>
+                  <th style={thStyle}>Last Contacted</th>
+                  <th style={thStyle}>Next Follow-Up</th>
+                  <th style={thStyle}>Generated Note</th>
+                  <th style={thStyle}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,6 +207,7 @@ export default async function LeadsPage() {
                     key={lead.id}
                     style={{
                       borderTop: "1px solid #1f2937",
+                      verticalAlign: "top",
                     }}
                   >
                     <td style={tdStyle}>{lead.name}</td>
@@ -234,7 +235,77 @@ export default async function LeadsPage() {
                         "-"
                       )}
                     </td>
-                    <td style={tdStyle}>{lead.notes || lead.commonGround || "-"}</td>
+                    <td style={tdStyle}>
+  {lead.lastContacted
+    ? new Date(lead.lastContacted).toLocaleDateString()
+    : "-"}
+</td>
+<td style={tdStyle}>
+  {lead.nextFollowUp
+    ? new Date(lead.nextFollowUp).toLocaleDateString()
+    : "-"}
+</td>
+                 <td style={{ ...tdStyle, minWidth: 400 }}>
+  <form
+    action="/api/leads/update-note"
+    method="POST"
+    style={{ display: "grid", gap: 8 }}
+  >
+    <input type="hidden" name="leadId" value={lead.id} />
+
+    <textarea
+      name="generatedNote"
+      defaultValue={lead.generatedNote || ""}
+      rows={6}
+      style={{
+        width: "100%",
+        background: "#0f172a",
+        color: "#e5e7eb",
+        border: "1px solid #1f2937",
+        borderRadius: 10,
+        padding: 10,
+        fontSize: 13,
+        lineHeight: 1.5,
+      }}
+    />
+
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <button type="submit" style={smallBtn("#059669")}>
+        Save
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard.writeText(
+            lead.generatedNote || ""
+          );
+        }}
+        style={smallBtn("#2563eb")}
+      >
+        Copy
+      </button>
+    </div>
+  </form>
+</td>
+
+<td style={tdStyle}>
+  <div style={{ display: "grid", gap: 8 }}>
+    <form action="/api/leads/generate-message" method="POST">
+      <input type="hidden" name="leadId" value={lead.id} />
+      <button style={smallBtn("#1d4ed8")}>
+        Regenerate
+      </button>
+    </form>
+
+    <form action="/api/leads/mark-messaged" method="POST">
+      <input type="hidden" name="leadId" value={lead.id} />
+      <button style={smallBtn("#7c3aed")}>
+        Mark Messaged
+      </button>
+    </form>
+  </div>
+</td>
                   </tr>
                 ))}
               </tbody>
@@ -291,3 +362,15 @@ const tdStyle: React.CSSProperties = {
   color: "#e5e7eb",
   fontSize: 14,
 };
+function smallBtn(color: string): React.CSSProperties {
+  return {
+    background: color,
+    color: "white",
+    border: "none",
+    borderRadius: 8,
+    padding: "8px 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+}

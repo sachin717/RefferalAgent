@@ -1,5 +1,5 @@
 
-import "../globals.css"
+// import "../globals.css"
 import { prisma } from "../lib/prisma";
 import AppShell from "@/app/components/AppShell";
 function parseJsonArray(value: string | null | undefined): string[] {
