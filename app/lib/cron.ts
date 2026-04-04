@@ -5,11 +5,11 @@ import { processQueue } from "./queueSender";
 export function startCron() {
   cron.schedule("* * * * *", async () => {
     console.log("Running automation");
-    await runAutomation();
+    // await runAutomation();
   });
 
   cron.schedule("* * * * *", async () => {
     console.log("Sending queue");
-    await processQueue();
+    // await processQueue();
   });
 }

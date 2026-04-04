@@ -8,18 +8,30 @@ datasource db {
 }
 
 model Job {
-  id        String @id @default(cuid())
-  title     String
-  company   String
-  link      String?
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  company    String
+  location   String?
+  source     String?
+  link       String?
+  matchScore Int      @default(0)
+  status     String   @default("discovered")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  applications Application[]
 }
+
 model Employee {
-  id      String @id @default(cuid())
-  name    String
-  role    String
-  profile String
-  company String
-  email   String?
+  id        String  @id @default(cuid())
+  name      String
+  role      String
+  profile   String
+  company   String
+  email     String?
   emailSent Boolean @default(false)
 }
 
@@ -30,23 +42,162 @@ model Message {
   jobTitle   String
   company    String
 }
+
 model EmailLog {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   to        String
   subject   String
   status    String
   createdAt DateTime @default(now())
 }
+
 model EmailQueue {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   to        String
   text      String
-  status    String @default("pending")
+  status    String   @default("pending")
   company   String
   createdAt DateTime @default(now())
 }
+
 model Settings {
-  id          String @id @default(cuid())
-  automation  Boolean @default(true)
-  dailyLimit  Int     @default(5)
+  id         String  @id @default(cuid())
+  automation Boolean @default(true)
+  dailyLimit Int     @default(5)
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile            CandidateProfile?
+  roleProfiles       RoleProfile[]
+  skills             Skill[]
+  projects           CandidateProject[]
+  companyPreferences CompanyPreference[]
+  resumes            Resume[]
+  jobs               Job[]
+  outreachLeads      OutreachLead[]
+  applications       Application[]
+}
+
+model CandidateProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  fullName           String
+  headline           String?
+  totalExperience    Int?
+  summary            String?
+  linkedinUrl        String?
+  githubUrl          String?
+  preferredLocations String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model RoleProfile {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  shortHeadline   String?
+  summary         String?
+  keySkills       String?
+  bestProjects    String?
+  targetCompanies String?
+  targetLocations String?
+  outreachTone    String?
+  preferred       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Skill {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  category  String?
+  years     Int?
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model CandidateProject {
+  id            String   @id @default(cuid())
+  userId        String
+  title         String
+  description   String?
+  techStack     String?
+  businessValue String?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model CompanyPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  priority  Int      @default(0)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Resume {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  fileUrl   String
+  roleTag   String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model OutreachLead {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  company       String
+  role          String?
+  linkedinUrl   String?
+  source        String?
+  priorityScore Int       @default(0)
+  status        String    @default("new")
+  commonGround  String?
+  generatedNote String?
+  followUp1     String?
+  followUp2     String?
+  notes         String?
+  lastContacted DateTime?
+  nextFollowUp  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Application {
+  id         String    @id @default(cuid())
+  userId     String
+  jobId      String
+  status     String    @default("ready")
+  resumeUsed String?
+  introNote  String?
+  appliedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  job  Job  @relation(fields: [jobId], references: [id])
 }
