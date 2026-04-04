@@ -6,60 +6,31 @@ import { NextResponse } from "next/server";
 
 
 export async function POST(req: Request) {
-const { id, subject, text } = await req.json();
+const { id, subject, text, manualEmail } = await req.json();
 
-  const emp = await prisma.employee.findUnique({
-    where: { id },
-  });
+const emp = await prisma.employee.findUnique({ where: { id } });
 
-  if (!emp) {
-    return NextResponse.json({ error: true });
-  }
+let email = emp?.email || manualEmail || null;
 
-  let email = emp.email;
+if (!email) {
+  email = await findEmailApollo(emp.name, emp.company);
 
-  // ✅ find email from Apollo if missing
-  if (!email) {
-    email = await findEmailApollo(
-      emp.name,
-      emp.company
-    );
-
-    if (email) {
-      await prisma.employee.update({
-        where: { id },
-        data: { email },
-      });
-    }
-  }
-
-  if (!email) {
-    return NextResponse.json({
-      error: "no email",
+  if (email) {
+    await prisma.employee.update({
+      where: { id },
+      data: { email },
     });
   }
+}
 
-  // ✅ AI message
-  // const text = await generateMessage(
-  //   emp.name,
-  //   emp.company
-  // );
+if (!email) {
+  return NextResponse.json({ error: "no email" }, { status: 400 });
+}
 
-  // ✅ send mail with resume
 await sendMail(
-  emp.email,
+  email,
   subject || `Exploring opportunities at ${emp.company}`,
-  text ||
-    `Hi ${emp.name},
-
-I hope you are doing well.
-
-I am currently exploring opportunities and would really appreciate a referral if possible.
-
-I have attached my resume.
-
-Thanks,
-Sachin`
+  text
 );
 
   // ✅ mark sent

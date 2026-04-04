@@ -82,6 +82,7 @@ const [drafts, setDrafts] = useState<
     }
   >
 >({});
+ const [manualEmails, setManualEmails] = useState<any>({});
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
   const [pageNotice, setPageNotice] = useState<{
     type: "success" | "error";
@@ -177,11 +178,12 @@ const handleSendReferral = async (employee: Employee) => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        id: employeeId,
-        subject: draft?.subject || `Exploring opportunities at ${employee.company || "your company"}`,
-        text: draft?.body || "",
-      }),
+    body: JSON.stringify({
+  id: employeeId,
+  subject: draft?.subject || `Exploring opportunities at ${employee.company || "your company"}`,
+  text: draft?.body || "",
+  manualEmail: manualEmails[employeeId] || "",
+}),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -349,6 +351,16 @@ const handleSendReferral = async (employee: Employee) => {
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                         {emp.email || "No email"}
                       </Typography>
+                      <input
+  placeholder="Enter email manually"
+  value={manualEmails[emp.id] || ""}
+  onChange={(e) =>
+    setManualEmails((prev:any) => ({
+      ...prev,
+      [emp.id]: e.target.value,
+    }))
+  }
+/>
 
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                         {emp.company || "No company"}

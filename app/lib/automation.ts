@@ -33,10 +33,10 @@ export async function runAutomation() {
     let email = e.email;
 
 if (!email) {
-  email = await findEmailApollo(
-    e.name,
-    e.company
-  );
+  // email = await findEmailApollo(
+  //   e.name,
+  //   e.company
+  // );
 
   if (email) {
     await prisma.employee.update({

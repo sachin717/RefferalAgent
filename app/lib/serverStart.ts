@@ -5,7 +5,7 @@ let started = false;
 export function startServer() {
   if (!started) {
     console.log("Starting cron...");
-    startCron();
+    // startCron();
     started = true;
   }
 }
