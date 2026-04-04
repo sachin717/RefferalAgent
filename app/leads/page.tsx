@@ -1,8 +1,7 @@
-'use client'
 import React from "react";
 import AppShell from "@/app/components/AppShell";
 import { prisma } from "@/app/lib/prisma";
-
+import CopyButton from "@/app/components/CopyButton";
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
@@ -273,18 +272,7 @@ export default async function LeadsPage() {
       <button type="submit" style={smallBtn("#059669")}>
         Save
       </button>
-
-      <button
-        type="button"
-        onClick={() => {
-          navigator.clipboard.writeText(
-            lead.generatedNote || ""
-          );
-        }}
-        style={smallBtn("#2563eb")}
-      >
-        Copy
-      </button>
+<CopyButton text={lead.generatedNote || ""} />
     </div>
   </form>
 </td>
@@ -293,16 +281,22 @@ export default async function LeadsPage() {
   <div style={{ display: "grid", gap: 8 }}>
     <form action="/api/leads/generate-message" method="POST">
       <input type="hidden" name="leadId" value={lead.id} />
-      <button style={smallBtn("#1d4ed8")}>
-        Regenerate
-      </button>
+      <button style={smallBtn("#1d4ed8")}>Regenerate</button>
     </form>
 
     <form action="/api/leads/mark-messaged" method="POST">
       <input type="hidden" name="leadId" value={lead.id} />
-      <button style={smallBtn("#7c3aed")}>
-        Mark Messaged
-      </button>
+      <button style={smallBtn("#7c3aed")}>Messaged</button>
+    </form>
+
+    <form action="/api/leads/mark-replied" method="POST">
+      <input type="hidden" name="leadId" value={lead.id} />
+      <button style={smallBtn("#059669")}>Replied</button>
+    </form>
+
+    <form action="/api/leads/mark-referred" method="POST">
+      <input type="hidden" name="leadId" value={lead.id} />
+      <button style={smallBtn("#ea580c")}>Referred</button>
     </form>
   </div>
 </td>
